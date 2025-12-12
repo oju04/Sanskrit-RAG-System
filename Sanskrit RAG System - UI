@@ -1,0 +1,325 @@
+import React, { useState } from 'react';
+import { Search, BookOpen, Cpu, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+const SanskritRAGSystem = () => {
+  const [query, setQuery] = useState('');
+  const [response, setResponse] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [retrievedChunks, setRetrievedChunks] = useState([]);
+
+  // Sanskrit documents preprocessed into chunks
+  const documentChunks = [
+    {
+      id: 1,
+      title: "मूर्खभृत्यस्य (The Foolish Servant)",
+      content: "गोवर्धनदासः स्वभृत्यम् शंखनादम् शर्करा आनेतुम् आदिशति। शंखनादः जीर्णे वस्त्रे शर्कराम् नयति, मार्गे सर्वा शर्करा स्त्रवति। गोवर्धनदासः कोपेन वदति - दृढायाम् सन्चिकायाम् वस्तूनि आनय इति।",
+      english: "Govardhanadasa orders his servant Shankhanada to bring sugar. Shankhanada brings sugar in torn cloth, all sugar spills on the way. Govardhanadasa angrily says - bring things in strong bag.",
+      theme: "foolishness, servant, instructions"
+    },
+    {
+      id: 2,
+      title: "मूर्खभृत्यस्य - श्वानशावक (Foolish Servant - Puppy)",
+      content: "गोवर्धनदासस्य पुत्रः श्वानशावकम् आनेतुम् आदिशति। शंखनादः शावकम् सन्चिकायाम् क्षिपति, वस्त्रेण आच्छादयति। शावकस्य श्वासः रुद्धः भवति, सः मृतः भवति। गोवर्धनदासः क्रोधेन वदति - श्वानादीन् दोरकेण बद्ध्वा आनय इति।",
+      english: "Son orders to bring puppy. Shankhanada puts puppy in bag and covers it. Puppy suffocates and dies. Govardhanadasa angrily says - bring dogs tied with rope.",
+      theme: "foolishness, instructions, misunderstanding"
+    },
+    {
+      id: 3,
+      title: "मूर्खभृत्यस्य - दुग्धम् (Foolish Servant - Milk)",
+      content: "गोवर्धनदासस्य भार्या दुग्धम् आनेतुम् कथयति। शंखनादः दुग्धपात्रम् दोरकेण बद्ध्वा कर्षति। मार्गे पात्रम् लुठति, दुग्धम् सर्वत्र प्रवहति। हताशः गोवर्धनदासः वदति - कृष्णम् भवतु ते मुखम् इति। शंखनादः कज्जलेन मुखम् लिम्पति।",
+      english: "Wife asks to bring milk. Shankhanada ties milk pot with rope and drags it. Pot rolls, milk spills everywhere. Frustrated Govardhanadasa says 'may your face become black'. Shankhanada applies kajal on face.",
+      theme: "foolishness, literal interpretation, frustration"
+    },
+    {
+      id: 4,
+      title: "मूर्खभृत्यस्य - नीतिः (Moral)",
+      content: "वरम् भृत्यविहीनस्य जीवितम् श्रमपूरितम्। मूर्खभृत्यस्य संसर्गात् सर्वम् कार्यम् विनश्यति॥",
+      english: "Better is a life full of labor without a servant. Association with a foolish servant destroys all work.",
+      theme: "moral, wisdom, servants"
+    },
+    {
+      id: 5,
+      title: "कालीदासस्य चातुर्यम् - भोजराज्ञः घोषणा (Kalidasa's Cleverness)",
+      content: "भोजराजा घोषयति - यः कविः नूतनं काव्यम् पठति तस्मै लक्षरुप्यकाणि दास्यामि। दरबारे विद्वांसः सन्ति ये एकपाठेन, द्विपाठेन, त्रिपाठेन काव्यम् स्मरन्ति। ते कवीन् वदन्ति - नूतनम् न, वयम् एतत् जानीमः इति।",
+      english: "King Bhoja announces - whoever reads new poetry gets one lakh rupees. Court has scholars who memorize after one, two, three readings. They tell poets - not new, we know this.",
+      theme: "poetry, challenge, memory"
+    },
+    {
+      id: 6,
+      title: "कालीदासस्य चातुर्यम् - समाधानम् (Solution)",
+      content: "कालीदासः कंचन कविम् सुभाषितम् ददाति। काव्ये वदति - भोजराजस्य पिता मम ९९ कोटि रत्नानि गृहीतवान्। राजन् तानि देहि। सर्वे विद्वांसः जानन्ति एतत् सत्यम्। नो चेत् ते मम कृतिम् न जानन्ति, ततः लक्षम् देहि इति। विद्वांसः वक्तुम् न शक्नुवन्ति, कविः लक्षम् प्राप्नोति।",
+      english: "Kalidasa gives a poet a verse. Poem says - Bhoja's father took my 99 crore gems. O King give them back. All scholars know this is true. If not, they don't know my work, then give lakh. Scholars cannot speak, poet gets lakh.",
+      theme: "cleverness, trick, poetry"
+    },
+    {
+      id: 7,
+      title: "वृद्धायाः चातुर्यम् - घण्टाकर्णः (Old Woman's Cleverness)",
+      content: "चित्रपुरे जनाः मन्यन्ते - पर्वते घण्टाकर्णः नाम राक्षसः अस्ति। चोरः घण्टां वने त्यक्तवान्। वानराः घण्टां वादयन्ति। जनाः भीताः भवन्ति। राजा घोषयति - यः घण्टाकर्णं नाशयति तस्मै सुवर्णम् यच्छामि।",
+      english: "In Chitrapura people think - on mountain lives demon Ghantakarna. Thief left bell in forest. Monkeys ring bell. People scared. King announces - who destroys Ghantakarna gets gold.",
+      theme: "fear, demon, announcement"
+    },
+    {
+      id: 8,
+      title: "वृद्धायाः चातुर्यम् - समाधानम् (Solution)",
+      content: "वृद्धा वनम् गच्छति। सा पश्यति - वानराः एव घण्टां वादयन्ति। सा वानरेभ्यः मधुराणि फलानि ददाति। यावत् ते फलानि खादन्ति तावत् सा घण्टाम् आदाय राजानम् गच्छति। वदति - घण्टाकर्णः मया हतः इति। सा सुवर्णम् प्राप्नोति।",
+      english: "Old woman goes to forest. She sees - monkeys are ringing bell. She gives sweet fruits to monkeys. While they eat, she takes bell and goes to king. Says - Ghantakarna killed by me. She gets gold.",
+      theme: "cleverness, solution, wisdom"
+    },
+    {
+      id: 9,
+      title: "देवभक्तः - प्रार्थना (Devotee's Prayer)",
+      content: "देवभक्तः प्रतिदिनम् प्रार्थयते - देव आरोग्यम् धनम् च देहि। सः प्रयत्नम् न करोति। एकदा वृषभशकटे गच्छति, चक्रम् मृण्मार्गे अन्तः गच्छति। सः प्रार्थयते - देव साहाय्यम् कुरु। त्रयः जनाः आगच्छन्ति, साहाय्यम् प्रयच्छन्ति, परं भक्तः वदति - भवतः साहाय्यम् न चाहि, देवः एव साहाय्यम् करिष्यति।",
+      english: "Devotee daily prays - God give health and wealth. He makes no effort. Once traveling in bullock cart, wheel stuck in mud. He prays - God help. Three people come offering help, but devotee says - don't need your help, God will help.",
+      theme: "devotion, effort, help"
+    },
+    {
+      id: 10,
+      title: "देवभक्तः - उपदेशः (Teaching)",
+      content: "भक्तः जले मरति, स्वर्गम् गच्छति। देवम् पृच्छति - भवान् किमर्थम् साहाय्यम् न कृतवान्? देवः वदति - अहम् त्रिवारम् आगतवान्, त्वम् न स्वीकृतवान्। यदि त्वम् प्रयत्नम् न करोषि तर्हि अहम् कथम् साहाय्यकृत्? उद्यमः साहसम् धैर्यम् बुद्धिः शक्तिः पराक्रमः। षडेते यत्र वर्तन्ते तत्र देवः साहाय्यकृत्॥",
+      english: "Devotee drowns, goes to heaven. Asks God - why didn't you help? God says - I came thrice, you didn't accept. If you don't make effort how can I help? Where effort, courage, patience, intellect, strength, valor exist, there God helps.",
+      theme: "effort, divine help, self-reliance"
+    },
+    {
+      id: 11,
+      title: "शीतं बाधते - कालीदासस्य चातुर्यम्",
+      content: "परदेशीयः पण्डितः भोजराज्ञः दरबारम् आगच्छति। कालीदासः पालखीधारकरूपेण तस्य स्वागतम् करोति। शिशिरऋतौ पण्डितः वदति 'शीतं बहु बाधति'। कालीदासः त्वरया वदति 'न तथा बाधते शीतं यथा बाधति बाधते'। बाध्-धातुः आत्मनेपदी इति पण्डितः न जानाति। सः मन्यते - यदि पालखीधारकाः अपि एतावत् जानन्ति तर्हि पण्डितैः सह मेलः पराभवाय एव। सः गृहम् प्रत्यागच्छति।",
+      english: "Foreign scholar comes to Bhoja's court. Kalidasa welcomes him disguised as palanquin bearer. In winter scholar says 'cold hurts much (wrong form)'. Kalidasa quickly says 'cold doesn't hurt as much as badhati badhate'. Scholar doesn't know badh is atmanepadi. Thinks - if even bearers know so much, meeting scholars will be defeat. Returns home.",
+      theme: "grammar, cleverness, defeat"
+    }
+  ];
+
+  // Simple keyword-based retrieval (CPU-efficient)
+  const retrieveRelevantChunks = (query) => {
+    const queryLower = query.toLowerCase();
+    const keywords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    
+    const scored = documentChunks.map(chunk => {
+      let score = 0;
+      const chunkText = (chunk.content + ' ' + chunk.english + ' ' + chunk.theme).toLowerCase();
+      
+      keywords.forEach(keyword => {
+        if (chunkText.includes(keyword)) {
+          score += 2;
+        }
+        // Partial matches
+        if (chunkText.split(/\s+/).some(word => word.includes(keyword) || keyword.includes(word))) {
+          score += 1;
+        }
+      });
+      
+      return { ...chunk, score };
+    });
+    
+    return scored
+      .filter(chunk => chunk.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  };
+
+  // Simple rule-based response generation (CPU-efficient alternative to LLM)
+  const generateResponse = (query, chunks) => {
+    if (chunks.length === 0) {
+      return {
+        answer: "क्षम्यताम्, अहं प्रश्नस्य उत्तरम् दातुम् असमर्थः अस्मि। (Sorry, I cannot find relevant information to answer this question.)",
+        confidence: "low"
+      };
+    }
+
+    const queryLower = query.toLowerCase();
+    
+    // Pattern matching for common question types
+    if (queryLower.includes('who') || queryLower.includes('कः') || queryLower.includes('का')) {
+      return {
+        answer: `Based on the Sanskrit texts:\n\n${chunks[0].english}\n\nसंस्कृते: ${chunks[0].content}`,
+        confidence: "high",
+        source: chunks[0].title
+      };
+    }
+    
+    if (queryLower.includes('what') || queryLower.includes('किम्') || queryLower.includes('कथा')) {
+      const summary = chunks.map(c => c.english).join('\n\n');
+      return {
+        answer: `The relevant stories are:\n\n${summary}`,
+        confidence: "high",
+        sources: chunks.map(c => c.title)
+      };
+    }
+    
+    if (queryLower.includes('moral') || queryLower.includes('teaching') || queryLower.includes('lesson') || queryLower.includes('नीति')) {
+      const moralChunk = chunks.find(c => c.theme.includes('moral') || c.theme.includes('wisdom'));
+      if (moralChunk) {
+        return {
+          answer: `The moral teaching is:\n\n${moralChunk.content}\n\nEnglish: ${moralChunk.english}`,
+          confidence: "high",
+          source: moralChunk.title
+        };
+      }
+    }
+    
+    if (queryLower.includes('कालीदास') || queryLower.includes('kalidasa')) {
+      const kalChunks = chunks.filter(c => c.title.includes('कालीदास'));
+      if (kalChunks.length > 0) {
+        return {
+          answer: `Kalidasa's stories:\n\n${kalChunks.map(c => c.english).join('\n\n')}`,
+          confidence: "high",
+          sources: kalChunks.map(c => c.title)
+        };
+      }
+    }
+    
+    // Default: return most relevant chunk
+    return {
+      answer: `Most relevant content:\n\n${chunks[0].english}\n\nसंस्कृते: ${chunks[0].content}`,
+      confidence: "medium",
+      source: chunks[0].title
+    };
+  };
+
+  const handleQuery = () => {
+    if (!query.trim()) return;
+    
+    setLoading(true);
+    setResponse(null);
+    setRetrievedChunks([]);
+    
+    // Simulate processing delay
+    setTimeout(() => {
+      const retrieved = retrieveRelevantChunks(query);
+      const answer = generateResponse(query, retrieved);
+      
+      setRetrievedChunks(retrieved);
+      setResponse(answer);
+      setLoading(false);
+    }, 800);
+  };
+
+  const sampleQueries = [
+    "Tell me about the foolish servant",
+    "What is the moral of these stories?",
+    "कालीदासस्य कथा वदतु",
+    "How did the old woman solve the problem?",
+    "What lesson about divine help is taught?"
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <BookOpen className="w-8 h-8 text-orange-600" />
+            <h1 className="text-3xl font-bold text-gray-800">Sanskrit RAG System</h1>
+            <Cpu className="w-6 h-6 text-blue-600 ml-auto" />
+          </div>
+          <p className="text-gray-600">Retrieval-Augmented Generation for Sanskrit Documents (CPU-optimized)</p>
+          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+            <FileText className="w-4 h-4" />
+            <span>Document Chunks: {documentChunks.length}</span>
+          </div>
+        </div>
+
+        {/* Query Interface */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Enter your query (English or Sanskrit):
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleQuery()}
+              placeholder="E.g., Tell me about Kalidasa's cleverness..."
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            />
+            <button
+              onClick={handleQuery}
+              disabled={loading || !query.trim()}
+              className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              {loading ? 'Processing...' : 'Search'}
+            </button>
+          </div>
+          
+          {/* Sample Queries */}
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 mb-2">Try these sample queries:</p>
+            <div className="flex flex-wrap gap-2">
+              {sampleQueries.map((sq, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setQuery(sq)}
+                  className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded-full hover:bg-orange-200"
+                >
+                  {sq}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Retrieved Chunks */}
+        {retrievedChunks.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              Retrieved Context ({retrievedChunks.length} chunks)
+            </h2>
+            <div className="space-y-3">
+              {retrievedChunks.map((chunk, idx) => (
+                <div key={chunk.id} className="border-l-4 border-orange-500 pl-4 py-2 bg-orange-50">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-medium text-gray-700">{chunk.title}</p>
+                    <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
+                      Score: {chunk.score}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1 font-sanskrit">{chunk.content.substring(0, 150)}...</p>
+                  <p className="text-xs text-gray-500 mt-1 italic">{chunk.english.substring(0, 150)}...</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Response */}
+        {response && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-blue-600" />
+              Generated Response
+            </h2>
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs px-2 py-1 rounded ${
+                  response.confidence === 'high' ? 'bg-green-200 text-green-800' :
+                  response.confidence === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                  'bg-red-200 text-red-800'
+                }`}>
+                  Confidence: {response.confidence}
+                </span>
+              </div>
+              <p className="text-gray-800 whitespace-pre-line">{response.answer}</p>
+              {response.source && (
+                <p className="text-xs text-gray-500 mt-3">Source: {response.source}</p>
+              )}
+              {response.sources && (
+                <p className="text-xs text-gray-500 mt-3">Sources: {response.sources.join(', ')}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* System Info */}
+        <div className="mt-6 bg-gray-100 rounded-lg p-4 text-xs text-gray-600">
+          <p><strong>System Architecture:</strong> Keyword-based retrieval + Rule-based generation (CPU-optimized)</p>
+          <p className="mt-1"><strong>Documents:</strong> Sanskrit moral stories with English translations</p>
+          <p className="mt-1"><strong>Retrieval Method:</strong> TF-based scoring with keyword matching</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SanskritRAGSystem;
